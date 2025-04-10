@@ -20,6 +20,7 @@ const MENU_INFO = [
     ],
   },
   { name: "고객", key: "customers", to: "/customers" },
+  { name: "계약", key: "contracts", to: "/contracts" },
   {
     name: "문자",
     key: "messages",
