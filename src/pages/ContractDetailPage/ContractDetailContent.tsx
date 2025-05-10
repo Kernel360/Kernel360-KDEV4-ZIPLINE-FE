@@ -59,8 +59,8 @@ interface ContractDetail {
   expectedContractEndDate: string | null;
   contractDate: string | null;
   status: string;
-  lessorOrSellerName: string;
-  lesseeOrBuyerName: string | null;
+  lessorOrSellerNames: string[];
+  lesseeOrBuyerNames: string[];
   documents: ContractDocument[];
   propertyAddress: string;
 }
@@ -75,6 +75,11 @@ interface Props {
   contract: ContractDetail;
   histories: ContractHistory[];
 }
+
+const getCustomerNamesDisplay = (names: string[] | undefined | null) => {
+  if (!names || names.length === 0) return "-";
+  return names.join(", ");
+};
 
 const ContractDetailContent = ({ contract, histories }: Props) => {
   return (
@@ -179,10 +184,10 @@ const ContractDetailContent = ({ contract, histories }: Props) => {
             <Typography variant="h6" fontWeight="bold" gutterBottom>
               계약 당사자 정보
             </Typography>
-            <InfoRow label="임대/매도인" value={contract.lessorOrSellerName ?? "-"} />
+            <InfoRow label="임대/매도인" value={getCustomerNamesDisplay(contract.lessorOrSellerNames)} />
             <InfoRow
               label="임차/매수인"
-              value={contract.lesseeOrBuyerName ?? "-"}
+              value={getCustomerNamesDisplay(contract.lesseeOrBuyerNames)}
             />
             <InfoRow label="계약일" value={contract.contractDate ?? "-"} />
           </CardContent>

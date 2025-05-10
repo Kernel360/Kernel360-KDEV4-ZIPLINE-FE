@@ -6,6 +6,9 @@ import {
   MenuItem,
   TextField,
   Button as MuiButton,
+  Select,
+  Chip,
+  OutlinedInput,
 } from "@mui/material";
 import { Dayjs } from "dayjs";
 import { DesktopDatePicker } from "@mui/x-date-pickers";
@@ -50,8 +53,8 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
   const [monthlyRent, setMonthlyRent] = useState("");
   const [price, setPrice] = useState("");
 
-  const [lessorUid, setLessorUid] = useState<number | null>(null);
-  const [lesseeUid, setLesseeUid] = useState<number | null>(null);
+  const [lessorUids, setLessorUids] = useState<number[]>([]);
+  const [lesseeUids, setLesseeUids] = useState<number[]>([]);
   const [propertyUid, setPropertyUid] = useState<number | null>(null);
   const [status, setStatus] = useState<ContractStatus>("IN_PROGRESS");
 
@@ -91,14 +94,14 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
     deposit?: string;
     monthlyRent?: string;
     price?: string;
-    lessorUid?: string;
-    lesseeUid?: string;
+    lessorUids?: string;
+    lesseeUids?: string;
     propertyUid?: string;
     status?: string;
   }>({});
 
   const isValidInteger = (value: string) => {
-    if (value === "") return true; 
+    if (value === "") return true;
     return /^\d+$/.test(value);
   };
   const validateInputs = () => {
@@ -119,9 +122,13 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
       newErrors.contractStartDate = "시작일은 종료일보다 이전이어야 합니다.";
     }
 
-    if (!lessorUid) newErrors.lessorUid = "임대/매도자를 선택해 주세요.";
-    if (lessorUid && lesseeUid && lessorUid === lesseeUid) {
-      newErrors.lesseeUid = "임대자와 임차자는 같을 수 없습니다.";
+    if (lessorUids.length === 0)
+      newErrors.lessorUids = "임대/매도자를 선택해 주세요.";
+
+    // 임대자와 임차자가 겹치는지 확인
+    const hasOverlap = lessorUids.some((id) => lesseeUids.includes(id));
+    if (hasOverlap) {
+      newErrors.lesseeUids = "임대자와 임차자는 같을 수 없습니다.";
     }
 
     if (!propertyUid) newErrors.propertyUid = "매물을 선택해 주세요.";
@@ -136,7 +143,7 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
     } else if (monthlyRent && Number(monthlyRent) < 0) {
       newErrors.monthlyRent = "월세는 0 이상의 숫자여야 합니다.";
     }
-    
+
     if (price && !isValidInteger(price)) {
       newErrors.price = "유효한 값을 입력해 주세요.";
     } else if (price && Number(price) < 0) {
@@ -147,14 +154,11 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
     return Object.keys(newErrors).length === 0;
   };
 
-
-  
-
   const handleSubmit = () => {
     if (!validateInputs()) return;
 
     const requestPayload = {
-      category,
+      category: category === "" ? null : category,
       contractDate: contractDate ? contractDate.format("YYYY-MM-DD") : null,
       contractStartDate: contractStartDate
         ? contractStartDate.format("YYYY-MM-DD")
@@ -168,8 +172,8 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
       deposit: deposit ? parseInt(deposit, 10) : 0,
       monthlyRent: monthlyRent ? parseInt(monthlyRent, 10) : 0,
       price: price ? parseInt(price, 10) : 0,
-      lessorOrSellerUid: lessorUid,
-      lesseeOrBuyerUid: lesseeUid,
+      lessorOrSellerUids: lessorUids,
+      lesseeOrBuyerUids: lesseeUids,
       propertyUid,
       status,
     };
@@ -205,8 +209,8 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
     setDeposit("");
     setMonthlyRent("");
     setPrice("");
-    setLessorUid(null);
-    setLesseeUid(null);
+    setLessorUids([]);
+    setLesseeUids([]);
     setPropertyUid(null);
     setStatus("IN_PROGRESS");
     setFiles([]);
@@ -236,7 +240,7 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
         <TextField
           select
           label="계약 카테고리"
-          value={category}
+          value={category ?? ""}
           onChange={(e) => setCategory(e.target.value)}
           error={!!errors.category}
           helperText={errors.category}
@@ -250,7 +254,7 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
 
         <TextField
           select
-          label="계약 상태"
+          label="계약 상태 *"
           value={status}
           onChange={(e) => setStatus(e.target.value as ContractStatus)}
           error={!!errors.status}
@@ -267,11 +271,32 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
 
         <TextField
           select
-          label="임대/매도자 선택"
-          value={lessorUid ?? ""}
-          onChange={(e) => setLessorUid(Number(e.target.value))}
-          error={!!errors.lessorUid}
-          helperText={errors.lessorUid}
+          label="임대/매도자 선택 *"
+          value={lessorUids}
+          onChange={(e) =>
+            setLessorUids(
+              typeof e.target.value === "string"
+                ? e.target.value.split(",").map(Number)
+                : e.target.value
+            )
+          }
+          SelectProps={{
+            multiple: true,
+            displayEmpty: true,
+            renderValue: (selected) =>
+              selected.length === 0
+                ? undefined
+                : (selected as number[])
+                    .map((uid) => {
+                      const customer = customerOptions.find(
+                        (c) => c.uid === uid
+                      );
+                      return customer?.name || uid;
+                    })
+                    .join(", "),
+          }}
+          error={!!errors.lessorUids}
+          helperText={errors.lessorUids}
           fullWidth
           sx={{ mb: 2 }}
         >
@@ -281,14 +306,34 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
             </MenuItem>
           ))}
         </TextField>
-
         <TextField
           select
           label="임차/매수자 선택"
-          value={lesseeUid ?? ""}
-          onChange={(e) => setLesseeUid(Number(e.target.value))}
-          error={!!errors.lesseeUid}
-          helperText={errors.lesseeUid}
+          value={lesseeUids ?? []}
+          onChange={(e) =>
+            setLesseeUids(
+              typeof e.target.value === "string"
+                ? e.target.value.split(",").map(Number)
+                : e.target.value
+            )
+          }
+          SelectProps={{
+            multiple: true,
+            displayEmpty: true,
+            renderValue: (selected) =>
+              selected.length === 0
+                ? undefined
+                : (selected as number[])
+                    .map((uid) => {
+                      const customer = customerOptions.find(
+                        (c) => c.uid === uid
+                      );
+                      return customer?.name || uid;
+                    })
+                    .join(", "),
+          }}
+          error={!!errors.lesseeUids}
+          helperText={errors.lesseeUids}
           fullWidth
           sx={{ mb: 2 }}
         >
@@ -301,7 +346,7 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
 
         <TextField
           select
-          label="매물 선택"
+          label="매물 선택 *"
           value={propertyUid ?? ""}
           onChange={(e) => setPropertyUid(Number(e.target.value))}
           error={!!errors.propertyUid}
@@ -328,11 +373,13 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
             value={contractDate}
             onChange={setContractDate}
             format="YYYY. MM. DD"
-            slotProps={{textField: {
-              fullWidth: true,
-              error: !!errors.contractDate,
-              helperText: errors.contractDate,
-            }, }}
+            slotProps={{
+              textField: {
+                fullWidth: true,
+                error: !!errors.contractDate,
+                helperText: errors.contractDate,
+              },
+            }}
           />
           <Box sx={{ display: "flex", gap: 2, my: 2 }}>
             <DesktopDatePicker
@@ -340,22 +387,26 @@ const ContractAddModal = ({ open, handleClose, fetchContractData }: Props) => {
               value={contractStartDate}
               onChange={setContractStartDate}
               format="YYYY. MM. DD"
-              slotProps={{ textField: {
-                fullWidth: true,
-                error: !!errors.contractStartDate,
-                helperText: errors.contractStartDate,
-              }, }}
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  error: !!errors.contractStartDate,
+                  helperText: errors.contractStartDate,
+                },
+              }}
             />
             <DesktopDatePicker
               label="종료일"
               value={contractEndDate}
               onChange={setContractEndDate}
               format="YYYY. MM. DD"
-              slotProps={{ textField: {
-                fullWidth: true,
-                error: !!errors.contractEndDate,
-                helperText: errors.contractEndDate,
-              }, }}
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  error: !!errors.contractEndDate,
+                  helperText: errors.contractEndDate,
+                },
+              }}
             />
           </Box>
           <DesktopDatePicker

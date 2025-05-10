@@ -71,8 +71,8 @@ const ContractEditModal = ({
   const [deposit, setDeposit] = useState("");
   const [monthlyRent, setMonthlyRent] = useState("");
   const [price, setPrice] = useState("");
-  const [lessorUid, setLessorUid] = useState<number | null>(null);
-  const [lesseeUid, setLesseeUid] = useState<number | null>(null);
+  const [lessorUids, setLessorUids] = useState<number[]>([]);
+  const [lesseeUids, setLesseeUids] = useState<number[]>([]);
   const [propertyUid, setPropertyUid] = useState<number | null>(null);
   const [status, setStatus] = useState<ContractStatus | "">("");
   const [newFiles, setNewFiles] = useState<File[]>([]);
@@ -98,7 +98,7 @@ const ContractEditModal = ({
 
       const allCustomers = customersRes.data.data.customers.map(
         (c: CustomerResponse) => ({
-          uid: c.uid,
+          uid: Number(c.uid),
           name: c.name,
         })
       );
@@ -112,14 +112,22 @@ const ContractEditModal = ({
       );
       setPropertyOptions(allProperties);
 
-      const matchedLessor = allCustomers.find(
-        (c: { name: CustomerResponse }) => c.name === data.lessorOrSellerName
+      setLessorUids(
+        (data.lessorOrSellerNames ?? [])
+          .map((name: string) => {
+            const found = allCustomers.find((c: { uid: number; name: string }) => c.name === name);
+            return found ? found.uid : null;
+          })
+          .filter((uid: number | null): uid is number => uid !== null)
       );
-      const matchedLessee = allCustomers.find(
-        (c: { name: CustomerResponse }) => c.name === data.lesseeOrBuyerName
+      setLesseeUids(
+        (data.lesseeOrBuyerNames ?? [])
+          .map((name: string) => {
+            const found = allCustomers.find((c: { uid: number; name: string }) => c.name === name);
+            return found ? found.uid : null;
+          })
+          .filter((uid: number | null): uid is number => uid !== null)
       );
-      setLessorUid(matchedLessor?.uid ?? null);
-      setLesseeUid(matchedLessee?.uid ?? null);
 
       const matchedProperty = allProperties.find(
         (p: { address: AgentPropertyResponse }) =>
@@ -198,8 +206,8 @@ const ContractEditModal = ({
       newErrors.contractStartDate = "시작일은 종료일보다 이전이어야 합니다.";
     }
 
-    if (!lessorUid) newErrors.lessorUid = "임대/매도자를 선택해 주세요.";
-    if (lessorUid && lesseeUid && lessorUid === lesseeUid) {
+    if (!lessorUids.length) newErrors.lessorUid = "임대/매도자를 선택해 주세요.";
+    if (lessorUids.length > 1 && lesseeUids.length > 1 && lessorUids.some(id => lesseeUids.includes(id))) {
       newErrors.lesseeUid = "임대자와 임차자는 같을 수 없습니다.";
     }
 
@@ -238,8 +246,8 @@ const ContractEditModal = ({
       deposit: deposit ? parseInt(deposit, 10) : 0,
       monthlyRent: monthlyRent ? parseInt(monthlyRent, 10) : 0,
       price: price ? parseInt(price, 10) : 0,
-      lessorOrSellerUid: lessorUid,
-      lesseeOrBuyerUid: lesseeUid,
+      lessorOrSellerUids: lessorUids,
+      lesseeOrBuyerUids: lesseeUids,
       propertyUid,
       status,
     };
@@ -346,9 +354,32 @@ const ContractEditModal = ({
 
         <TextField
           select
-          label="임대/매도자 선택"
-          value={lessorUid !== null ? String(lessorUid) : ""}
-          onChange={(e) => setLessorUid(Number(e.target.value))}
+          label="임대/매도자 선택 *"
+          value={lessorUids}
+          onChange={(e) =>
+            setLessorUids(
+              typeof e.target.value === "string"
+                ? e.target.value.split(",").map(Number)
+                : e.target.value
+            )
+          }
+          SelectProps={{
+            multiple: true,
+            displayEmpty: true,
+            renderValue: (selected: unknown) => {
+              const arr = selected as number[];
+              return arr.length === 0
+                ? undefined
+                : arr
+                    .map((uid) => {
+                      const customer = customerOptions.find(
+                        (c) => c.uid === uid
+                      );
+                      return customer?.name || uid;
+                    })
+                    .join(", ");
+            },
+          }}
           error={!!errors.lessorUid}
           helperText={errors.lessorUid}
           fullWidth
@@ -360,14 +391,33 @@ const ContractEditModal = ({
             </MenuItem>
           ))}
         </TextField>
-
         <TextField
           select
           label="임차/매수자 선택"
-          value={lesseeUid !== null ? String(lesseeUid) : ""}
-          onChange={(e) => {
-            const val = e.target.value;
-            setLesseeUid(val === "" ? null : Number(val));
+          value={lesseeUids}
+          onChange={(e) =>
+            setLesseeUids(
+              typeof e.target.value === "string"
+                ? e.target.value.split(",").map(Number)
+                : e.target.value
+            )
+          }
+          SelectProps={{
+            multiple: true,
+            displayEmpty: true,
+            renderValue: (selected: unknown) => {
+              const arr = selected as number[];
+              return arr.length === 0
+                ? undefined
+                : arr
+                    .map((uid) => {
+                      const customer = customerOptions.find(
+                        (c) => c.uid === uid
+                      );
+                      return customer?.name || uid;
+                    })
+                    .join(", ");
+            },
           }}
           error={!!errors.lesseeUid}
           helperText={errors.lesseeUid}
@@ -375,7 +425,7 @@ const ContractEditModal = ({
           sx={{ mb: 2 }}
         >
           {customerOptions.map((c) => (
-            <MenuItem key={c.uid} value={String(c.uid)}>
+            <MenuItem key={c.uid} value={c.uid}>
               {c.name}
             </MenuItem>
           ))}

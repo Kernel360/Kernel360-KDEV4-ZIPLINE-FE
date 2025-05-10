@@ -113,6 +113,16 @@ const ContractTable = ({
     );
   };
 
+  const getCustomerDisplay = (customer: string | string[] | null | undefined) => {
+    if (!customer || customer === "null") return "-";
+    if (Array.isArray(customer)) {
+      if (customer.length === 0) return "-";
+      if (customer.length === 1) return customer[0];
+      return `${customer[0]} 외 ${customer.length - 1}명`;
+    }
+    return customer;
+  };
+
   return (
     <Box sx={{ width: "100%", mt: 4 }}>
       <Paper sx={{ width: "100%", overflow: "hidden" }}>
@@ -140,10 +150,10 @@ const ContractTable = ({
                     onClick={() => onRowClick?.(contract)}
                   >
                     <TableCell align="center">
-                      {contract.lessorOrSellerName ?? "-"}
+                      {getCustomerDisplay(contract.lessorOrSellerNames)}
                     </TableCell>
                     <TableCell align="center">
-                      {contract.lesseeOrBuyerName ?? "-"}
+                      {getCustomerDisplay(contract.lesseeOrBuyerNames)}
                     </TableCell>
                     <TableCell align="center">{contract.address}</TableCell>
                     <TableCell align="center">
